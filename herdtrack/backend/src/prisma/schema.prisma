@@ -1,0 +1,100 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Farm/User Management
+model Farm {
+  id        String   @id @default(cuid())
+  name      String
+  logoUrl   String?
+  theme     String   @default("light")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cows           Cow[]
+  medicalRecords MedicalRecord[]
+
+  @@map("farms")
+}
+
+// Main Cow Entity
+model Cow {
+  id                String   @id @default(cuid())
+  name              String
+  breedType         String
+  birthDate         DateTime
+  birthWeight       Decimal  @db.Decimal(5, 2) // Birth weight in pounds
+  height            Decimal  @db.Decimal(5, 2) // Height in inches
+  colorPattern      String
+  location          String?
+  profilePictureUrl String?
+  certificateUrl    String?
+  registryNumber    String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  farmId            String
+  
+  farm              Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  medicalRecords    MedicalRecord[]
+  asChild           ParentageLink[] @relation("child")
+  asSire            ParentageLink[] @relation("sire")
+  asDam             ParentageLink[] @relation("dam")
+
+  @@index([farmId])
+  @@index([breedType])
+  @@index([location])
+  @@index([birthWeight])
+  @@map("cows")
+}
+
+// Parentage/Lineage Management
+model ParentageLink {
+  id              String   @id @default(cuid())
+  childId         String
+  sireId          String?
+  sireName        String? // For external sires
+  sireBreed       String?
+  damId           String?
+  damName         String? // For external dams
+  damBreed        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  child           Cow      @relation("child", fields: [childId], references: [id], onDelete: Cascade)
+  sire            Cow?     @relation("sire", fields: [sireId], references: [id], onDelete: SetNull)
+  dam             Cow?     @relation("dam", fields: [damId], references: [id], onDelete: SetNull)
+
+  @@unique([childId])
+  @@index([sireId])
+  @@index([damId])
+  @@map("parentage_links")
+}
+
+// Medical Records
+model MedicalRecord {
+  id          String   @id @default(cuid())
+  cowId       String
+  farmId      String
+  date        DateTime
+  description String
+  category    String   @default("general") // general, vaccination, illness, injury, treatment, breeding
+  notes       String?
+  documentUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  cow         Cow      @relation(fields: [cowId], references: [id], onDelete: Cascade)
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+
+  @@index([cowId])
+  @@index([farmId])
+  @@index([date])
+  @@map("medical_records")
+}
